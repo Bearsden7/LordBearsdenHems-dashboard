@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>HEMS Remote Dashboard</title>
+<link rel="stylesheet" href="">
+<style>
+  body{font-family:sans-serif;background:#f4f7fb;color:#222;padding:20px;max-width:900px;margin:0 auto}
+  h1{color:#0759a8}
+  .card{background:#fff;border-radius:10px;padding:18px;margin:12px 0;box-shadow:0 6px 18px rgba(20,20,80,0.06)}
+  .large{font-size:36px;font-weight:700}
+  .info{display:flex;justify-content:space-between;align-items:center;margin:8px 0}
+  button{padding:12px;border-radius:8px;border:none;cursor:pointer;font-weight:700}
+  .btn-on{background:#2ecc71;color:#000}
+  .btn-off{background:#e74c3c;color:#fff}
+  .btn-auto{background:#f39c12;color:#fff}
+  .btn-silence{background:#ff8c00;color:#fff}
+  input[type=number]{padding:10px;border-radius:8px;border:1px solid #ddd;width:100%}
+  .small{font-size:14px;color:#666}
+  .status-ok{background:#dff0d8;color:#27632a;padding:8px;border-radius:6px}
+  .status-alarm{background:#fde2e2;color:#8a1f1f;padding:8px;border-radius:6px}
+  .row{display:flex;gap:12px;flex-wrap:wrap}
+  .col{flex:1;min-width:180px}
+</style>
+</head>
+<body>
+  <h1>HEMS Remote Dashboard</h1>
+  <p class="small">Broker: <code>test.mosquitto.org</code> · Topic prefix: <code>hems/LordBearsden</code></p>
+
+  <div id="connected" class="card small">Connecting to broker...</div>
+
+  <div class="card">
+    <div class="info"><div><strong>Power</strong></div><div id="power" class="large">-- W</div></div>
+    <div class="info"><div><strong>Presence</strong></div><div id="presence">--</div></div>
+    <div class="info"><div><strong>Threshold</strong></div><div id="threshold">-- W</div></div>
+    <div class="info"><div><strong>Auto Mode</strong></div><div id="autoMode">--</div></div>
+    <div class="info"><div><strong>Power LED</strong></div><div id="powerLed">--</div></div>
+    <div class="info"><div><strong>Alarm</strong></div><div id="alarm">--</div></div>
+  </div>
+
+  <div class="card">
+    <h3>Controls</h3>
+    <div class="row">
+      <div class="col">
+        <button id="btnPowerOn" class="btn-on" style="width:100%">Turn POWER ON</button>
+        <button id="btnPowerOff" class="btn-off" style="width:100%;margin-top:8px">Turn POWER OFF</button>
+      </div>
+      <div class="col">
+        <button id="btnAutoOn" class="btn-auto" style="width:100%">Enable Auto-Control</button>
+        <button id="btnAutoOff" class="btn-auto" style="width:100%;margin-top:8px">Disable Auto-Control</button>
+      </div>
+      <div class="col">
+        <button id="btnSilence" class="btn-silence" style="width:100%">Silence Alarm (60s)</button>
+        <div style="margin-top:8px">
+          <label for="newThreshold">Set Threshold (W)</label>
+          <input id="newThreshold" type="number" min="100" max="5000" step="10" placeholder="e.g. 800">
+          <button id="btnSetThreshold" style="width:100%;margin-top:8px">Set Threshold</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card small">
+    <p>Pages auto-update via MQTT over WebSockets. If telemetry looks stale, refresh the page or check the ESP32 console.</p>
+  </div>
+
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<script>
+  // Broker & topics
+  const brokerUrl = 'ws://test.mosquitto.org/mqtt'; // WebSocket endpoint
+  const prefix = 'hems/LordBearsden';
+  const opts = {
+    keepalive: 30,
+    reconnectPeriod: 2000,
+    clientId: 'HEMS_WEB_' + Math.random().toString(16).substr(2,8),
+    protocolId: 'MQTT',
+    protocolVersion: 4,
+    clean: true
+  };
+
+  const client = mqtt.connect(brokerUrl, opts);
+  const connectedEl = document.getElementById('connected');
+  const powerEl = document.getElementById('power');
+  const presenceEl = document.getElementById('presence');
+  const thresholdEl = document.getElementById('threshold');
+  const autoEl = document.getElementById('autoMode');
+  const pLedEl = document.getElementById('powerLed');
+  const alarmEl = document.getElementById('alarm');
+
+  client.on('connect', function () {
+    connectedEl.textContent = 'Connected to broker';
+    connectedEl.style.background = '#e9f7ef';
+    // subscribe to telemetry
+    client.subscribe(prefix + '/telemetry/#', function(err){
+      if(err) console.warn('Subscribe error', err);
+    });
+    // request retained values (they will arrive if broker retained them)
+  });
+
+  client.on('reconnect', function(){ connectedEl.textContent = 'Reconnecting...'; });
+  client.on('close', function(){ connectedEl.textContent = 'Disconnected'; connectedEl.style.background=''; });
+
+  client.on('message', function(topic, message) {
+    const payload = message.toString();
+    //console.log(topic, payload);
+    if (topic === prefix + '/telemetry/power') {
+      powerEl.textContent = parseFloat(payload).toFixed(1) + ' W';
+    } else if (topic === prefix + '/telemetry/presence') {
+      presenceEl.textContent = payload;
+    } else if (topic === prefix + '/telemetry/threshold') {
+      thresholdEl.textContent = payload + ' W';
+      document.getElementById('newThreshold').value = payload;
+    } else if (topic === prefix + '/telemetry/powerLed') {
+      pLedEl.textContent = payload;
+    } else if (topic === prefix + '/telemetry/autoMode') {
+      autoEl.textContent = payload;
+    } else if (topic === prefix + '/telemetry/alarm') {
+      alarmEl.textContent = payload;
+      if (payload === 'ON') {
+        alarmEl.className = 'status-alarm';
+      } else {
+        alarmEl.className = 'status-ok';
+      }
+    }
+  });
+
+  // Buttons
+  document.getElementById('btnPowerOn').addEventListener('click', ()=>{
+    client.publish(prefix + '/cmd/power', 'ON');
+  });
+  document.getElementById('btnPowerOff').addEventListener('click', ()=>{
+    client.publish(prefix + '/cmd/power', 'OFF');
+  });
+  document.getElementById('btnAutoOn').addEventListener('click', ()=>{
+    client.publish(prefix + '/cmd/auto', 'ON');
+  });
+  document.getElementById('btnAutoOff').addEventListener('click', ()=>{
+    client.publish(prefix + '/cmd/auto', 'OFF');
+  });
+  document.getElementById('btnSilence').addEventListener('click', ()=>{
+    client.publish(prefix + '/cmd/silence', '1');
+  });
+  document.getElementById('btnSetThreshold').addEventListener('click', ()=>{
+    const v = document.getElementById('newThreshold').value;
+    if (v && !isNaN(v)) {
+      client.publish(prefix + '/cmd/threshold', String(parseInt(v)));
+    } else alert('Enter a valid threshold');
+  });
+
+  // Show disconnected state if no messages for a while (optional)
+</script>
+</body>
+</html>
