@@ -26,7 +26,7 @@
 </head>
 <body>
   <h1>HEMS Remote Dashboard</h1>
-  <p class="small">Broker: <code>test.mosquitto.org</code> · Topic prefix: <code>hems/LordBearsden</code></p>
+  <p class="small">Broker: <code>Broker: 85.119.83.194</code> · Topic prefix: <code>hems/LordBearsden</code></p>
 
   <div id="connected" class="card small">Connecting to broker...</div>
 
@@ -68,7 +68,8 @@
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 <script>
   // Broker & topics
-  const brokerUrl = 'ws://test.mosquitto.org/mqtt'; // WebSocket endpoint
+  const brokerUrl = 'ws://85.119.83.194:8080/mqtt';
+ // WebSocket endpoint
   const prefix = 'hems/LordBearsden';
   const opts = {
     keepalive: 30,
