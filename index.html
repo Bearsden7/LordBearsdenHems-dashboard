@@ -4,7 +4,6 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>HEMS Remote Dashboard</title>
-<link rel="stylesheet" href="">
 <style>
   body{font-family:sans-serif;background:#f4f7fb;color:#222;padding:20px;max-width:900px;margin:0 auto}
   h1{color:#0759a8}
@@ -16,61 +15,112 @@
   .btn-off{background:#e74c3c;color:#fff}
   .btn-auto{background:#f39c12;color:#fff}
   .btn-silence{background:#ff8c00;color:#fff}
-  input[type=number]{padding:10px;border-radius:8px;border:1px solid #ddd;width:100%}
+  .btn-disable{background:#95a5a6;color:#fff}
+  input[type=number]{padding:10px;border-radius:8px;border:1px solid #ddd;width:100%;box-sizing:border-box}
   .small{font-size:14px;color:#666}
   .status-ok{background:#dff0d8;color:#27632a;padding:8px;border-radius:6px}
   .status-alarm{background:#fde2e2;color:#8a1f1f;padding:8px;border-radius:6px}
   .row{display:flex;gap:12px;flex-wrap:wrap}
   .col{flex:1;min-width:180px}
+  
+  /* Alert Modal */
+  .modal{display:none;position:fixed;z-index:1000;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,0.5);animation:fadeIn 0.3s}
+  .modal-content{background:#fff;margin:15% auto;padding:30px;border-radius:15px;width:90%;max-width:400px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,0.3);animation:slideDown 0.3s}
+  .modal h2{color:#e74c3c;margin-top:0}
+  .modal button{margin-top:20px;padding:15px 30px;font-size:16px}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  @keyframes slideDown{from{transform:translateY(-50px);opacity:0}to{transform:translateY(0);opacity:1}}
+  
+  /* Pulse animation for alarm */
+  @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+  .pulse{animation:pulse 1s infinite}
 </style>
 </head>
 <body>
-  <h1>HEMS Remote Dashboard</h1>
-  <p class="small">Broker: <code>Broker: 85.119.83.194</code> · Topic prefix: <code>hems/LordBearsden</code></p>
+  <h1>🏠 HEMS Remote Dashboard</h1>
+  <p class="small">Broker: <code>broker.hivemq.com</code> · Topic: <code>hems/LordBearsden</code></p>
 
-  <div id="connected" class="card small">Connecting to broker...</div>
+  <div id="connected" class="card small">🔄 Connecting to broker...</div>
 
   <div class="card">
+    <h3>📊 Live Telemetry</h3>
     <div class="info"><div><strong>Power</strong></div><div id="power" class="large">-- W</div></div>
     <div class="info"><div><strong>Presence</strong></div><div id="presence">--</div></div>
     <div class="info"><div><strong>Threshold</strong></div><div id="threshold">-- W</div></div>
     <div class="info"><div><strong>Auto Mode</strong></div><div id="autoMode">--</div></div>
     <div class="info"><div><strong>Power LED</strong></div><div id="powerLed">--</div></div>
-    <div class="info"><div><strong>Alarm</strong></div><div id="alarm">--</div></div>
+    <div class="info"><div><strong>Alarm Status</strong></div><div id="alarm">--</div></div>
+    <div class="info"><div><strong>Alarm Enabled</strong></div><div id="alarmEnabled">--</div></div>
   </div>
 
   <div class="card">
-    <h3>Controls</h3>
+    <h3>🎮 Controls</h3>
     <div class="row">
       <div class="col">
-        <button id="btnPowerOn" class="btn-on" style="width:100%">Turn POWER ON</button>
-        <button id="btnPowerOff" class="btn-off" style="width:100%;margin-top:8px">Turn POWER OFF</button>
+        <button id="btnPowerOn" class="btn-on" style="width:100%">⚡ Turn POWER ON</button>
+        <button id="btnPowerOff" class="btn-off" style="width:100%;margin-top:8px">🔌 Turn POWER OFF</button>
       </div>
       <div class="col">
-        <button id="btnAutoOn" class="btn-auto" style="width:100%">Enable Auto-Control</button>
-        <button id="btnAutoOff" class="btn-auto" style="width:100%;margin-top:8px">Disable Auto-Control</button>
+        <button id="btnAutoOn" class="btn-auto" style="width:100%">🤖 Enable Auto-Control</button>
+        <button id="btnAutoOff" class="btn-auto" style="width:100%;margin-top:8px">✋ Disable Auto-Control</button>
       </div>
       <div class="col">
-        <button id="btnSilence" class="btn-silence" style="width:100%">Silence Alarm (60s)</button>
-        <div style="margin-top:8px">
-          <label for="newThreshold">Set Threshold (W)</label>
-          <input id="newThreshold" type="number" min="100" max="5000" step="10" placeholder="e.g. 800">
-          <button id="btnSetThreshold" style="width:100%;margin-top:8px">Set Threshold</button>
-        </div>
+        <button id="btnAlarmOn" class="btn-on" style="width:100%">🔔 Enable Alarm</button>
+        <button id="btnAlarmOff" class="btn-disable" style="width:100%;margin-top:8px">🔕 Disable Alarm</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>⚙️ Settings</h3>
+    <div class="row">
+      <div class="col">
+        <label for="newThreshold"><strong>Power Threshold (W)</strong></label>
+        <input id="newThreshold" type="number" min="100" max="5000" step="10" placeholder="e.g. 800">
+        <button id="btnSetThreshold" class="btn-auto" style="width:100%;margin-top:8px">✅ Set Threshold</button>
+      </div>
+      <div class="col">
+        <label for="silenceDuration"><strong>Silence Alarm Duration</strong></label>
+        <select id="silenceDuration" style="padding:10px;border-radius:8px;border:1px solid #ddd;width:100%;margin-top:8px">
+          <option value="30">30 seconds</option>
+          <option value="60" selected>1 minute</option>
+          <option value="120">2 minutes</option>
+          <option value="300">5 minutes</option>
+          <option value="600">10 minutes</option>
+          <option value="1800">30 minutes</option>
+        </select>
+        <button id="btnSilence" class="btn-silence" style="width:100%;margin-top:8px">🔇 Silence Alarm</button>
       </div>
     </div>
   </div>
 
   <div class="card small">
-    <p>Pages auto-update via MQTT over WebSockets. If telemetry looks stale, refresh the page or check the ESP32 console.</p>
+    <p><strong>✅ How it works:</strong></p>
+    <ul style="text-align:left;margin:10px 0">
+      <li>ESP32 sends updates every <strong>10 seconds</strong></li>
+      <li>When you click a button, ESP32 responds within 10 seconds</li>
+      <li>You'll get a <strong>pop-up alert</strong> when power crosses threshold</li>
+      <li>Disable alarm to stop buzzer completely</li>
+    </ul>
+  </div>
+
+  <!-- Alert Modal -->
+  <div id="alertModal" class="modal">
+    <div class="modal-content pulse">
+      <h2>⚠️ THRESHOLD CROSSED!</h2>
+      <p style="font-size:18px;margin:20px 0">Power consumption has exceeded the threshold!</p>
+      <button class="btn-off" onclick="closeAlert()">OK, Got It</button>
+    </div>
   </div>
 
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 <script>
-  // Broker & topics
-  const brokerUrl = 'ws://85.119.83.194:8080/mqtt';
- // WebSocket endpoint
-  const prefix = 'hems/LordBearsden';
+  // IMPORTANT: Change this to match your ESP32 code!
+  const prefix = 'hems/LordBearsden';  // Must match baseTopic in Arduino code
+  
+  // HiveMQ public broker with WebSocket support
+  const brokerUrl = 'wss://broker.hivemq.com:8884/mqtt';
+  
   const opts = {
     keepalive: 30,
     reconnectPeriod: 2000,
@@ -81,6 +131,8 @@
   };
 
   const client = mqtt.connect(brokerUrl, opts);
+  
+  // Get elements
   const connectedEl = document.getElementById('connected');
   const powerEl = document.getElementById('power');
   const presenceEl = document.getElementById('presence');
@@ -88,23 +140,59 @@
   const autoEl = document.getElementById('autoMode');
   const pLedEl = document.getElementById('powerLed');
   const alarmEl = document.getElementById('alarm');
+  const alarmEnabledEl = document.getElementById('alarmEnabled');
+  const alertModal = document.getElementById('alertModal');
+
+  let lastAlertTime = 0;
+  const ALERT_COOLDOWN = 30000; // Don't spam alerts - wait 30 seconds between alerts
+
+  function showAlert() {
+    const now = Date.now();
+    if (now - lastAlertTime > ALERT_COOLDOWN) {
+      alertModal.style.display = 'block';
+      lastAlertTime = now;
+      // Play sound if browser allows
+      try {
+        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBixy0fPTgjMGHm7A7+OZURE');
+        audio.play().catch(e => console.log('Audio play failed:', e));
+      } catch(e) {}
+    }
+  }
+
+  function closeAlert() {
+    alertModal.style.display = 'none';
+  }
+
+  // Close modal if clicking outside
+  window.onclick = function(event) {
+    if (event.target == alertModal) {
+      closeAlert();
+    }
+  }
 
   client.on('connect', function () {
-    connectedEl.textContent = 'Connected to broker';
+    connectedEl.innerHTML = '✅ Connected to broker';
     connectedEl.style.background = '#e9f7ef';
-    // subscribe to telemetry
-    client.subscribe(prefix + '/telemetry/#', function(err){
-      if(err) console.warn('Subscribe error', err);
-    });
-    // request retained values (they will arrive if broker retained them)
+    connectedEl.style.color = '#27632a';
+    
+    // Subscribe to telemetry and alerts
+    client.subscribe(prefix + '/telemetry/#');
+    client.subscribe(prefix + '/alert/#');
   });
 
-  client.on('reconnect', function(){ connectedEl.textContent = 'Reconnecting...'; });
-  client.on('close', function(){ connectedEl.textContent = 'Disconnected'; connectedEl.style.background=''; });
+  client.on('reconnect', function(){ 
+    connectedEl.textContent = '🔄 Reconnecting...'; 
+    connectedEl.style.background = '#fff3cd';
+  });
+  
+  client.on('close', function(){ 
+    connectedEl.textContent = '❌ Disconnected'; 
+    connectedEl.style.background='#fde2e2'; 
+  });
 
   client.on('message', function(topic, message) {
     const payload = message.toString();
-    //console.log(topic, payload);
+    
     if (topic === prefix + '/telemetry/power') {
       powerEl.textContent = parseFloat(payload).toFixed(1) + ' W';
     } else if (topic === prefix + '/telemetry/presence') {
@@ -123,34 +211,65 @@
       } else {
         alarmEl.className = 'status-ok';
       }
+    } else if (topic === prefix + '/telemetry/alarmEnabled') {
+      alarmEnabledEl.textContent = payload;
+      if (payload === 'ON') {
+        alarmEnabledEl.className = 'status-ok';
+      } else {
+        alarmEnabledEl.className = 'status-alarm';
+      }
+    } else if (topic === prefix + '/alert/threshold') {
+      if (payload === 'CROSSED') {
+        showAlert();
+      }
     }
   });
 
-  // Buttons
+  // Button handlers
   document.getElementById('btnPowerOn').addEventListener('click', ()=>{
     client.publish(prefix + '/cmd/power', 'ON');
   });
+  
   document.getElementById('btnPowerOff').addEventListener('click', ()=>{
     client.publish(prefix + '/cmd/power', 'OFF');
   });
+  
   document.getElementById('btnAutoOn').addEventListener('click', ()=>{
     client.publish(prefix + '/cmd/auto', 'ON');
   });
+  
   document.getElementById('btnAutoOff').addEventListener('click', ()=>{
     client.publish(prefix + '/cmd/auto', 'OFF');
   });
-  document.getElementById('btnSilence').addEventListener('click', ()=>{
-    client.publish(prefix + '/cmd/silence', '1');
+  
+  document.getElementById('btnAlarmOn').addEventListener('click', ()=>{
+    client.publish(prefix + '/cmd/alarmEnable', 'ON');
   });
+  
+  document.getElementById('btnAlarmOff').addEventListener('click', ()=>{
+    if (confirm('Are you sure you want to disable the alarm completely?')) {
+      client.publish(prefix + '/cmd/alarmEnable', 'OFF');
+    }
+  });
+  
+  document.getElementById('btnSilence').addEventListener('click', ()=>{
+    const duration = document.getElementById('silenceDuration').value;
+    client.publish(prefix + '/cmd/silence', duration);
+    const minutes = Math.floor(duration / 60);
+    const seconds = duration % 60;
+    const timeStr = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+    alert(`Alarm silenced for ${timeStr}`);
+  });
+  
   document.getElementById('btnSetThreshold').addEventListener('click', ()=>{
     const v = document.getElementById('newThreshold').value;
-    if (v && !isNaN(v)) {
+    if (v && !isNaN(v) && v >= 100 && v <= 5000) {
       client.publish(prefix + '/cmd/threshold', String(parseInt(v)));
-    } else alert('Enter a valid threshold');
+      alert('Threshold updated! Wait up to 10 seconds to see it on the display.');
+    } else {
+      alert('Please enter a valid threshold between 100 and 5000 watts');
+    }
   });
-
-  // Show disconnected state if no messages for a while (optional)
 </script>
 </body>
 </html>
-
